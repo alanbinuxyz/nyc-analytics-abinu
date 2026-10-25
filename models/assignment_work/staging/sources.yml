@@ -1,0 +1,34 @@
+version: 2
+sources:
+  - name: raw
+    description: Raw data loaded from NYC Open Data
+    database: alanbinu-cis-baruch
+    schema: nyc_dob_raw_data
+    tables:
+      - name: source_nyc_dob_job_apps
+        description: |
+          NYC 311 service requests for Dept of Transportation.
+          One row per service request.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+alanbinu-cis-baruch.nyc_dob_raw_data.source_nyc_dob_job_apps
