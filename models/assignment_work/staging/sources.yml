@@ -10,9 +10,7 @@ sources:
           NYC 311 service requests for Dept of Transportation.
           One row per service request.
 
-version: 2
-sources:
-  - name: raw
+  - name: dob_raw
     description: Raw data loaded from NYC Open Data
     database: alanbinu-cis-baruch
     schema: nyc_dob_raw_data 
