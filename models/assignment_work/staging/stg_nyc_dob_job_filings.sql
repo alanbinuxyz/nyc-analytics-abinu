@@ -1,170 +1,107 @@
 
-{{ config(materialized='table') }}
-
--- Clean and standardize DOB NOW job application filings
--- One row per unique job filing number
+-- Clean and standardize DOB NOW Job Application Filings data
+-- One row per job filing
 
 WITH source AS (
-    SELECT *
-    FROM {{ source('dob_raw', 'source_nyc_dob_job_apps') }}
-),
+  SELECT * FROM {{ source('dob_raw', 'source_nyc_dob_job_apps') }}
+), -- Easier to refer to the dbt reference to a long name table this way
 
 cleaned AS (
-    SELECT
-        * EXCEPT (
-            job_filing_number,
-            filing_status,
-            job_type,
-            filing_date,
-            current_status_date,
-            first_permit_date,
-            approved_date,
-            signoff_date,
-            borough,
-            postcode,
-            zip,
-            street_name,
-            initial_cost,
-            latitude,
-            longitude
-        ),
+  SELECT
+      -- Get all columns from source, except ones we're transforming below
+      -- To do cleaning on them or explicitly cast them as types just in case
+      * EXCEPT (
+          job_filing_number,
+          filing_date,
+          current_status_date,
+          filing_status,
+          job_type,
+          postcode,
+          zip,
+          borough,
+          house_no,
+          street_name,
+          initial_cost,
+          total_construction_floor_area,
+          latitude,
+          longitude
+      ),
 
-        -- Identifiers
-        UPPER(TRIM(CAST(job_filing_number AS STRING)))
-            AS job_filing_number,
+      -- Identifiers
+      CAST(job_filing_number AS STRING) AS filing_id,
 
-        -- Extract the main job number without filing suffix
-        SPLIT(
-            UPPER(TRIM(CAST(job_filing_number AS STRING))),
-            '-'
-        )[SAFE_OFFSET(0)] AS job_number,
+      -- Date/Time
+      SAFE_CAST(filing_date AS TIMESTAMP) AS filing_date,
+      SAFE_CAST(current_status_date AS TIMESTAMP) AS current_status_date,
 
-        -- Filing details
-        UPPER(TRIM(CAST(filing_status AS STRING)))
-            AS filing_status,
+      -- Job filing details
+      CAST(job_type AS STRING) AS job_type,
+      UPPER(TRIM(CAST(filing_status AS STRING))) AS status,
 
-        UPPER(TRIM(CAST(job_type AS STRING)))
-            AS job_type,
+      -- Location - clean zip code, handling several common zip code data problems
+      -- Postcode is the building, while zip is the applicant 
+      CASE
+          WHEN UPPER(TRIM(CAST(postcode AS STRING))) IN ('N/A', 'NA') THEN NULL
+          WHEN UPPER(TRIM(CAST(postcode AS STRING))) = 'ANONYMOUS' THEN 'Anonymous'
+          WHEN REGEXP_CONTAINS(TRIM(CAST(postcode AS STRING)), r'^\d{5}$')
+              THEN TRIM(CAST(postcode AS STRING))
+          WHEN REGEXP_CONTAINS(TRIM(CAST(postcode AS STRING)), r'^\d{9}$')
+              THEN SUBSTR(TRIM(CAST(postcode AS STRING)), 1, 5)
+          WHEN REGEXP_CONTAINS(TRIM(CAST(postcode AS STRING)), r'^\d{5}-\d{4}$')
+              THEN SUBSTR(TRIM(CAST(postcode AS STRING)), 1, 5)
+          ELSE NULL
+      END AS zip,
 
-        -- Dates: convert to DATE for easier analysis
-        -- Handle both standard and MM/DD/YYYY formats
-        COALESCE(
-            SAFE_CAST(filing_date AS DATE),
-            SAFE_CAST(SAFE_CAST(filing_date AS TIMESTAMP) AS DATE),
-            SAFE.PARSE_DATE(
-                '%m/%d/%Y',
-                SUBSTR(CAST(filing_date AS STRING), 1, 10)
-            )
-        ) AS filing_date,
+      -- Location - standardized borough, just in case
+      CASE
+          WHEN UPPER(TRIM(CAST(borough AS STRING))) IN ('MANHATTAN', 'NEW YORK COUNTY') THEN 'Manhattan'
+          WHEN UPPER(TRIM(CAST(borough AS STRING))) IN ('BRONX', 'THE BRONX') THEN 'Bronx'
+          WHEN UPPER(TRIM(CAST(borough AS STRING))) IN ('BROOKLYN', 'KINGS COUNTY') THEN 'Brooklyn'
+          WHEN UPPER(TRIM(CAST(borough AS STRING))) IN ('QUEENS', 'QUEEN', 'QUEENS COUNTY') THEN 'Queens'
+          WHEN UPPER(TRIM(CAST(borough AS STRING))) IN ('STATEN ISLAND', 'RICHMOND COUNTY') THEN 'Staten Island'
+          ELSE 'UNKNOWN or CITYWIDE'
+      END AS borough,
 
-        COALESCE(
-            SAFE_CAST(current_status_date AS DATE),
-            SAFE_CAST(SAFE_CAST(current_status_date AS TIMESTAMP) AS DATE),
-            SAFE.PARSE_DATE(
-                '%m/%d/%Y',
-                SUBSTR(CAST(current_status_date AS STRING), 1, 10)
-            )
-        ) AS current_status_date,
+      CAST(house_no AS STRING) AS house_number,
+      CAST(street_name AS STRING) AS street_name,
 
-        SAFE_CAST(first_permit_date AS DATE)
-            AS first_permit_date,
+      -- Combine house number and street name into one address
+      CONCAT(
+          TRIM(CAST(house_no AS STRING)),
+          ' ',
+          TRIM(CAST(street_name AS STRING))
+      ) AS incident_address,
 
-        SAFE_CAST(approved_date AS DATE)
-            AS approved_date,
+      -- Preserve applicant ZIP under a clearer column name
+      CAST(zip AS STRING) AS applicant_zip,
 
-        SAFE_CAST(signoff_date AS DATE)
-            AS signoff_date,
+      -- Job costs and construction details
+      SAFE_CAST(
+          REGEXP_REPLACE(CAST(initial_cost AS STRING), r'[$,]', '')
+          AS NUMERIC
+      ) AS initial_cost,
 
-        -- Conformed dimension: standardize borough
-        CASE
-            WHEN UPPER(TRIM(CAST(borough AS STRING)))
-                IN ('MANHATTAN', 'NEW YORK COUNTY')
-                THEN 'Manhattan'
+      SAFE_CAST(total_construction_floor_area AS FLOAT64)
+          AS construction_floor_area,
 
-            WHEN UPPER(TRIM(CAST(borough AS STRING)))
-                IN ('BRONX', 'THE BRONX')
-                THEN 'Bronx'
+      CAST(latitude AS DECIMAL) AS latitude,
+      CAST(longitude AS DECIMAL) AS longitude,
 
-            WHEN UPPER(TRIM(CAST(borough AS STRING)))
-                IN ('BROOKLYN', 'KINGS COUNTY')
-                THEN 'Brooklyn'
+      -- Metadata
+      CURRENT_TIMESTAMP() AS _stg_loaded_at
 
-            WHEN UPPER(TRIM(CAST(borough AS STRING)))
-                IN ('QUEENS', 'QUEEN', 'QUEENS COUNTY')
-                THEN 'Queens'
+  FROM source
 
-            WHEN UPPER(TRIM(CAST(borough AS STRING)))
-                IN ('STATEN ISLAND', 'RICHMOND COUNTY')
-                THEN 'Staten Island'
+  -- Filters
+  WHERE job_filing_number IS NOT NULL
+  AND filing_date IS NOT NULL
+  AND borough IS NOT NULL
 
-            ELSE 'UNKNOWN or CITYWIDE'
-        END AS borough,
-
-        -- Conformed dimension: ZIP code of job location
-        -- Keep first five digits; handle ZIP+4 formats
-        REGEXP_EXTRACT(
-            TRIM(CAST(postcode AS STRING)),
-            r'^(\d{5})(?:-?\d{4}|\.0)?$'
-        ) AS zip,
-
-        -- Preserve applicant ZIP under a clearer name
-        NULLIF(TRIM(CAST(zip AS STRING)), '')
-            AS applicant_zip,
-
-        -- Clean street name
-        NULLIF(
-            UPPER(TRIM(CAST(street_name AS STRING))),
-            ''
-        ) AS street_name,
-
-        -- Create address compatible with the 311 model
-        NULLIF(
-            TRIM(
-                CONCAT(
-                    COALESCE(TRIM(CAST(house_no AS STRING)), ''),
-                    ' ',
-                    COALESCE(TRIM(CAST(street_name AS STRING)), '')
-                )
-            ),
-            ''
-        ) AS incident_address,
-
-        -- Convert construction cost to numeric
-        -- Remove dollar signs and commas if present
-        SAFE_CAST(
-            REGEXP_REPLACE(
-                CAST(initial_cost AS STRING),
-                r'[$,]',
-                ''
-            ) AS NUMERIC
-        ) AS initial_cost,
-
-        -- Geographic coordinates
-        SAFE_CAST(latitude AS FLOAT64) AS latitude,
-        SAFE_CAST(longitude AS FLOAT64) AS longitude,
-
-        -- Metadata
-        CURRENT_TIMESTAMP() AS _stg_loaded_at
-
-    FROM source
-
-    -- Filter out rows without a usable filing identifier
-    WHERE NULLIF(
-        TRIM(CAST(job_filing_number AS STRING)),
-        ''
-    ) IS NOT NULL
+  -- Deduplicate
+  QUALIFY ROW_NUMBER() OVER (
+      PARTITION BY job_filing_number
+      ORDER BY current_status_date DESC
+  ) = 1
 )
 
--- Deduplicate by filing number
--- Keep the record with the most recent status date
-SELECT *
-FROM cleaned
-
-QUALIFY ROW_NUMBER() OVER (
-    PARTITION BY job_filing_number
-    ORDER BY
-        current_status_date DESC NULLS LAST,
-        filing_date DESC NULLS LAST
-) = 1
-
--- Final model: stg_nyc_dob_job_filings
+SELECT * FROM cleaned
