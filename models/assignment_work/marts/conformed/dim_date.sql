@@ -6,7 +6,7 @@ WITH stg_311 AS (
 ),
 
 stg_dob AS (
-    SELECT * FROM {{ ref('stg_nyc_dob_filings') }}
+    SELECT * FROM {{ ref('stg_nyc_dob_job_filings') }}
 ),
 
 -- Then union dates from the staging data together, collecting all poss dates
