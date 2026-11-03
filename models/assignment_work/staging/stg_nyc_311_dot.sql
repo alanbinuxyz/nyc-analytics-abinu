@@ -43,7 +43,7 @@ cleaned AS (
        CAST(descriptor AS STRING) AS descriptor,
        UPPER(TRIM(CAST(status AS STRING))) AS status,
 
-       -- Location - clean zip code, handling several common zip code data problems
+      -- Location - clean zip code, handling several common zip code data problems
        CASE
            WHEN UPPER(TRIM(CAST(incident_zip AS STRING))) IN ('N/A', 'NA') THEN NULL
            WHEN UPPER(TRIM(CAST(incident_zip AS STRING))) = 'ANONYMOUS' THEN 'Anonymous'
@@ -53,7 +53,7 @@ cleaned AS (
                AND REGEXP_CONTAINS(CAST(incident_zip AS STRING), r'^\d{5}-\d{4}')
            THEN CAST(incident_zip AS STRING)
            ELSE NULL
-       END AS zip,
+       END AS zip
 
        -- Location - standardized borough, just in case
        CASE
@@ -72,7 +72,7 @@ cleaned AS (
        CAST(latitude AS DECIMAL) AS latitude,
        CAST(longitude AS DECIMAL) AS longitude,
 
-       -- Clearer column name as well for this one
+       
        CAST(open_data_channel_type AS STRING) AS method_of_submission,
 
        -- Metadata
