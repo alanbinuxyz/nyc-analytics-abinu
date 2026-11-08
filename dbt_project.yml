@@ -42,7 +42,7 @@ models:
   project_group9_work:
      staging:
        +materialized: table
-       +schema: nyc_project_group_9_staging
+       +schema: nyc_project_group9_final_warehouse
 
      marts:
        +materialized: table
