@@ -39,3 +39,20 @@ models:
        dot_311:
          +materialized: table
 
+  project_group9_work:
+     staging:
+       +materialized: table
+       +schema: nyc_project_group_9_staging
+
+     marts:
+       +materialized: table
+       +schema: nyc_project_warehouse_marts
+      
+       conformed:
+         +materialized: table
+
+       dof_parking__camera_violations:
+         +materialized: table
+
+       idling_double_parking_311:
+         +materialized: table
