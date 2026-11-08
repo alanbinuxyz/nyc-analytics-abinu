@@ -16,43 +16,42 @@ clean-targets:
  - "target"
  - "dbt_packages"
 
-# Set up models, which are basically SQL files, to create tables
 models:
- nyc_analytics:
-   +materialized: table
+  nyc_analytics:
+    +materialized: table
 
-   assignment_work:
-     staging:
-       +materialized: table
-       +schema: nyc_homework_staging
+    assignment_work:
+      staging:
+        +materialized: table
+        +schema: nyc_homework_staging
 
-     marts:
-       +materialized: table
-       +schema: nyc_homework_warehouse_marts
-      
-       conformed:
-         +materialized: table
+      marts:
+        +materialized: table
+        +schema: nyc_homework_warehouse_marts
 
-       dob_job_filings:
-         +materialized: table
+        conformed:
+          +materialized: table
 
-       dot_311:
-         +materialized: table
+        dob_job_filings:
+          +materialized: table
 
-  project_group9_work:
-     staging:
-       +materialized: table
-       +schema: nyc_project_group9_final_warehouse
+        dot_311:
+          +materialized: table
 
-     marts:
-       +materialized: table
-       +schema: nyc_project_warehouse_marts
-      
-       conformed:
-         +materialized: table
+    project_group9_work:
+      staging:
+        +materialized: table
+        +schema: nyc_project_group9_final_warehouse
 
-       dof_parking__camera_violations:
-         +materialized: table
+      marts:
+        +materialized: table
+        +schema: nyc_project_warehouse_marts
 
-       idling_double_parking_311:
-         +materialized: table
+        conformed:
+          +materialized: table
+
+        dof_parking__camera_violations:
+          +materialized: table
+
+        idling_double_parking_311:
+          +materialized: table
