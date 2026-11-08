@@ -1,0 +1,14 @@
+version: 2
+sources:
+  - name: raw_data
+    description: Raw data loaded from NYC Open Data
+    database: my-project-777-374215
+    schema: group_project_raw_data
+    tables:
+      - name: source_311service_requests_subset
+        description: |
+          NYC 311 service requests for Dept of Transportation for idiling and double parking.
+          One row per service request.
+      - name: source_parking_camera_violations
+        description: |
+          A single Camera and Parking violations for idling and double parking
